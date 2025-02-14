@@ -1,57 +1,47 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTokenList } from "../hooks/useTokenList";
 
-const SelectToken = ({ isOpen, onClose, onSelect }: any) => {
+const SelectToken = ({ 
+  isOpenFrom, 
+  isOpenTo, 
+  onClose, 
+  onSelect, 
+  fromTokenAddress = null, 
+  toTokenAddress = null 
+}: any) => {
+  
     const [searchQuery, setSearchQuery] = useState('');
+
+      const { tokens, isLoading, error } = useTokenList();
     
-    const tokens = [
-      {
-        symbol: '2CRV',
-        name: 'Curve.fi USDC/USDT',
-        icon: '🌈'
-      },
-      {
-        symbol: 'aArbAAVE',
-        name: 'Aave Arbitrum AAVE',
-        icon: 'A'
-      },
-      {
-        symbol: 'aArbARB',
-        name: 'Aave Arbitrum ARB',
-        icon: 'A'
-      },
-      {
-        symbol: 'aArbDAI',
-        name: 'Aave Arbitrum DAI',
-        icon: 'D'
-      },
-      {
-        symbol: 'aArbEURS',
-        name: 'Aave Arbitrum EURS',
-        icon: 'E'
-      },
-      {
-        symbol: 'aArbGHO',
-        name: 'Aave Arbitrum GHO',
-        icon: 'G'
-      },
-      {
-        symbol: 'aArbLINK',
-        name: 'Aave Arbitrum LINK',
-        icon: 'L'
-      },
-      {
-        symbol: 'aArbLUSD',
-        name: 'Aave Arbitrum LUSD',
-        icon: 'L'
-      }
-    ];
+      // const filteredTokens = tokens.filter(token => 
+      //   token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      //   token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      //   token.address.includes(searchQuery)
+      // );
+
+      const filteredTokens = useMemo(() => {
+        let result = tokens;
+    
+        // If selecting "from" token, exclude the current "to" token
+        if (isOpenFrom && toTokenAddress) {
+          result = result.filter(token => token.address !== toTokenAddress);
+        }
+    
+        // If selecting "to" token, exclude the current "from" token
+        if (isOpenTo && fromTokenAddress) {
+          result = result.filter(token => token.address !== fromTokenAddress);
+        }
+    
+        // Apply search query filtering
+        return result.filter(token => 
+          token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          token.address.includes(searchQuery)
+        );
+      }, [tokens, searchQuery, isOpenFrom, isOpenTo, fromTokenAddress, toTokenAddress]);
   
-    const filteredTokens = tokens.filter(token => 
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  
-    if (!isOpen) return null;
+    if (!isOpenTo && !isOpenFrom) return null;
   
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -86,9 +76,17 @@ const SelectToken = ({ isOpen, onClose, onSelect }: any) => {
           </div>
   
           <div className="max-h-96 overflow-y-auto">
-            {filteredTokens.map((token) => (
+
+          {isLoading ? (
+            <div className="text-center text-gray-400 py-4">Loading tokens...</div>
+          ) : error ? (
+            <div className="text-center text-red-500 py-4">{error}</div>
+          ) : filteredTokens.length === 0 ? (
+            <div className="text-center text-gray-400 py-4">No tokens found</div>
+          ) : (
+            filteredTokens.map((token) => (
               <button
-                key={token.symbol}
+                key={token.address}
                 onClick={() => {
                   onSelect(token);
                   onClose();
@@ -96,14 +94,28 @@ const SelectToken = ({ isOpen, onClose, onSelect }: any) => {
                 className="w-full flex items-center gap-3 p-3 hover:bg-gray-900 rounded-lg transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white">
-                  {token.icon}
+                  {token.icon.startsWith("http") ? (
+                    <img src={token.icon} alt={token.symbol} className="w-8 h-8 rounded-full" />
+                  ) : (
+                    token.icon
+                  )}
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="text-white font-medium">{token.symbol}</span>
                   <span className="text-gray-400 text-sm">{token.name}</span>
                 </div>
+                {/* {token.balance && (
+                  <div className="ml-auto text-right">
+                    <div className="text-white">{token.balance}</div>
+                    <div className="text-sm text-gray-400">
+                      ${token.balance * token.price}
+                    </div>
+                  </div>
+                )} */}
               </button>
-            ))}
+            ))
+          )}
+          
           </div>
         </div>
       </div>

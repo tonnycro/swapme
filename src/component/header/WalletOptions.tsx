@@ -1,5 +1,4 @@
-import * as React from 'react'
-import { Connector, useConnect } from 'wagmi'
+import {  useConnect } from 'wagmi'
 
 
 interface WalletOptionsProps {
@@ -24,7 +23,7 @@ export function WalletOptions({ onClose }: WalletOptionsProps) {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
-          <div className="text-gray-500 cursor-help">?</div>
+          {/* <div className="text-gray-500 cursor-help">?</div> */}
           <h2 className="text-white text-lg font-medium">Connect Wallet</h2>
         </div>
         <button 

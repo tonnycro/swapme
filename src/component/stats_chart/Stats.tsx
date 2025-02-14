@@ -1,52 +1,84 @@
-import React from 'react';
 import { EChartsOption } from 'echarts';
-import ReactECharts from 'echarts-for-react';
+import SankeyChart from 'echarts-for-react';
+import { useContext } from 'react';
+import { BContext } from '../../utils/Context';
 
 export default function Stats() {
-  // Define the chart options
+  const { tradePath, madeAchoice } = useContext(BContext);
+
   const option: EChartsOption = {
-    legend: {
-      top: 'bottom',
+    title: {
+      text: ''
     },
-    toolbox: {
-      show: false,
-      feature: {
-        mark: { show: true },
-        dataView: { show: true, readOnly: false },
-        restore: { show: true },
-        saveAsImage: { show: true },
-      },
+    tooltip: {
+      trigger: 'item',
+      triggerOn: 'mousemove'
     },
     series: [
       {
-        name: 'Nightingale Chart',
-        type: 'pie',
-        radius: [50, 250],
-        center: ['50%', '50%'],
-        roseType: 'area',
-        itemStyle: {
-          borderRadius: 8,
+        type: 'sankey',
+        data: tradePath.map((token) => ({ name: token })),
+        links: tradePath.slice(0, -1).map((from, i) => ({
+          source: from,
+          target: tradePath[i + 1],
+          value: 1,
+        })),
+        emphasis: {
+          focus: 'adjacency'
         },
-        label: {
-          color: '#FFFFFF'
-        },
-        data: [
-          { value: 40, name: 'rose 1' },
-          { value: 38, name: 'rose 2' },
-          { value: 32, name: 'rose 3' },
-          { value: 30, name: 'rose 4' },
-          { value: 28, name: 'rose 5' },
-          { value: 26, name: 'rose 6' },
-          { value: 22, name: 'rose 7' },
-          { value: 18, name: 'rose 8' },
+        levels: [
+          {
+            depth: 0,
+            itemStyle: {
+              color: '#fbb4ae'
+            },
+            lineStyle: {
+              color: 'source',
+              opacity: 0.6
+            }
+          },
+          {
+            depth: 1,
+            itemStyle: {
+              color: '#b3cde3'
+            },
+            lineStyle: {
+              color: 'source',
+              opacity: 0.6
+            }
+          },
+          {
+            depth: 2,
+            itemStyle: {
+              color: '#ccebc5'
+            },
+            lineStyle: {
+              color: 'source',
+              opacity: 0.6
+            }
+          },
+          {
+            depth: 3,
+            itemStyle: {
+              color: '#decbe4'
+            },
+            lineStyle: {
+              color: 'source',
+              opacity: 0.6
+            }
+          }
         ],
-      },
-    ],
+        lineStyle: {
+          curveness: 0.5
+        }
+      }
+    ]
   };
 
   return (
-    <div className='h-[500px] md:h-auto'>
-      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+    <div className='h-[500px] md:h-auto flex flex-col justify-center items-center'>
+      <h1 className='justify-self-start text-center font-bold'>{madeAchoice === "path found" ? "Route path for this trade" : "Possible route paths"}</h1>
+      <SankeyChart option={option} style={{ height: '75%', width: '100%' }} />
     </div>
   );
 }

@@ -4,46 +4,64 @@ import Footer from './component/footer/Footer'
 import Header from './component/header/Header'
 import Stats from './component/stats_chart/Stats'
 import Swap from './component/swap/Swap'
-import { injected, WagmiProvider } from 'wagmi'
-import { http, createConfig } from 'wagmi'
-import { mainnet, sepolia, bsc } from 'wagmi/chains'
-import { metaMask, safe, walletConnect } from 'wagmi/connectors'
-import { useContext } from 'react'
+import { WagmiProvider } from 'wagmi'
+
+import { useContext, useEffect, useState } from 'react'
 import { BContext } from './utils/Context'
 import { WalletOptions } from './component/header/WalletOptions'
+import { config } from './utils/configigurations'
+import Preloader from './component/loaders/Preloader'
+import Notify from './component/loaders/Notify'
 
 
 // const { chains, publicClient } = configureChains(
 //   [mainnet, bsc],
 //   [publicProvider()]
 // )
-const projectId = '<WALLETCONNECT_PROJECT_ID>'
 
-const config = createConfig({
-  chains: [mainnet, sepolia, bsc],
-  connectors: [
-    injected(),
-    walletConnect({ projectId }),
-    metaMask(),
-    safe(),
-  ],
-  transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
-    [bsc.id]: http()
-  },
-})
 
 const queryClient = new QueryClient()
 
 
 function App() {
-    const { showConnectors, setShowConnectors } = useContext(BContext);
+    const { notify, setNotify, showConnectors, setShowConnectors } = useContext(BContext);
+    const [preloader, setPreloader] = useState<boolean>(true);
+
+
+    useEffect(() => {
+      setTimeout(() => {
+        setPreloader(false)
+      }, 5000);
+    }, [preloader])
+
+      // Auto-close after 5 seconds
+    useEffect(() => {
+    if (notify.active) {
+      const timer = setTimeout(() => {
+        setNotify({
+          active: false,
+          type: '',
+          title: '',
+          message: ''
+        });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [notify.active]);
+    
 
   return (
     <div className='relative'>
      <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
+       {
+        preloader && <Preloader />
+       }
+
+       {
+        notify && <Notify />
+       }
       {showConnectors && (
           <WalletOptions onClose={() => setShowConnectors(false)} />
         )}

@@ -1,13 +1,20 @@
-import React from 'react'
 
 export default function Footer() {
   return (
-    <div className='border-t border-gray-800 mt-5 flex justify-between p-5'>
-       <div className="text-[#333333] flex justify-start items-center gap-7">
-         <span>Terms of use</span>
-         <span>Policy</span>
-         <span>Audit</span>
-         <span>Docs</span>
+    <div className='border-t border-gray-800 mt-5 flex flex-col justify-start items-start gap-6 md:flex-row md:justify-between md:items-center  md:gap-0 p-5 relative z-20'>
+       <div className="text-[#FFFFFF] flex justify-start items-center gap-7">
+         <span>
+          <a href="https://pegasus-2.gitbook.io/pegasus-docs">Terms of use</a>
+         </span>
+         <span>
+          <a href="#">Policy</a>
+         </span>
+         <span>
+          <a href="#">Audit</a>
+          </span>
+         <span>
+          <a href="https://pegasus-2.gitbook.io/pegasus-docs">Docs</a>
+         </span>
        </div>
 
        <div className="flex justify-end items-center gap-5">

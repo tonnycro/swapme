@@ -1,11 +1,11 @@
 import { useContext } from 'react'
-import { Connector, useAccount, useConnect, useDisconnect, useEnsAvatar, useEnsName } from 'wagmi'
+import {  useAccount,  useDisconnect, useEnsAvatar, useEnsName } from 'wagmi'
 import { BContext } from '../../utils/Context'
 import { formatAddress } from '../../utils/Constants';
 
 
 const Header = () => {
-    const {showConnectors, setShowConnectors } = useContext(BContext);
+    const { showConnectors, setShowConnectors } = useContext(BContext);
     const { address } = useAccount()
     const { disconnect } = useDisconnect()
     const { data: ensName } = useEnsName({ address })
@@ -20,7 +20,7 @@ const Header = () => {
         {/* Logo and brand */}
         <div className="flex items-center space-x-2">
           <img 
-            src="/logo.png" 
+            src="/logo.jpg" 
             alt="pegasus" 
             className="w-10 h-8"
           />

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import UseClickOutside from "./useClickOutside"
+import useClickOutside from "./UseClickOutside";
 
 
 interface Option {
@@ -30,7 +30,7 @@ const CustomDropdown = ({
     }
   };
 
-  const ref = UseClickOutside<HTMLDivElement>(handleClickOutside);
+  const ref = useClickOutside<HTMLDivElement>(handleClickOutside);
 
   const toggleDropdown = () => setIsOpen(!isOpen);
 
