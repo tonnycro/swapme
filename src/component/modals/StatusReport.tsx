@@ -48,7 +48,7 @@ const StatusReport = ({
                         <p className="text-gray-400 text-center mb-8 text-sm">
                             Your Trade was successful.
                         </p>
-                        <button onClick={onClose} className="bg-purple-500 hover:bg-purple-600 text-white font-medium py-3 px-6 rounded-lg w-full">
+                        <button onClick={onClose} className="bg-[#ee7244] hover:bg-[#c75d36] text-white font-medium py-3 px-6 rounded-lg w-full">
                            Back to home
                         </button>
                         <div className="text-gray-400 text-center mt-4">

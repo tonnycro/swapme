@@ -1,12 +1,12 @@
 import { EChartsOption } from 'echarts';
 import SankeyChart from 'echarts-for-react';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { BContext } from '../../utils/Context';
 
 export default function Stats() {
   const { tradePath, madeAchoice } = useContext(BContext);
 
-  const option: EChartsOption = {
+  const option: EChartsOption = useMemo(() => ( {
     title: {
       text: ''
     },
@@ -73,7 +73,7 @@ export default function Stats() {
         }
       }
     ]
-  };
+  }), [tradePath]);
 
   return (
     <div className='h-[500px] md:h-auto flex flex-col justify-center items-center'>

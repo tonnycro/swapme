@@ -13,7 +13,7 @@ const ChangeChain = ({
       }
 
 
-      const pickChain = (chainId: 97 | 56 | 146 | 57054) => {
+      const pickChain = (chainId: 146) => {
         changeChain(chainId);
         closeState(false);
       }
@@ -62,7 +62,7 @@ const ChangeChain = ({
                 <div className="flex flex-col gap-2">
                     {
                         supportedChains.map((data, index) => (
-                        <div onClick={() => pickChain(data.id as 97 | 56 | 146 | 57054)} className="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-900 border border-transparent hover:border-gray-700 rounded-lg transition-colors cursor-pointer" key={index}>
+                        <div onClick={() => pickChain(data.id as 146)} className="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-900 border border-transparent hover:border-gray-700 rounded-lg transition-colors cursor-pointer" key={index}>
                             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white">
                                 <img src={data.logo} alt="chain logo" />
                             </div>

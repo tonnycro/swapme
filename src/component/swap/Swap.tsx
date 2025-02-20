@@ -1,7 +1,7 @@
 import {  useContext, useEffect, useRef, useState } from "react";
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { BContext } from "../../utils/Context";
-import {  aggregatorABI, AggregatorAddress, ERCABI, formatAddress, formatAmount, formatBigNumber, formatTokenBalance, formatTokenPrice, getBestQuote, getGasDetails, getTokenApproval, getTokenBalance, getTokenPrice, getTradePath } from "../../utils/Constants";
+import {  aggregatorABI, AggregatorAddress, convertToArrayOrdered, ERCABI, formatAddress, formatBigNumber, formatTokenBalance, formatTokenPrice, getBestQuote, getGasDetails, getTokenApproval, getTokenBalance, getTokenPrice, getTradePath } from "../../utils/Constants";
 import SelectToken from "./SelectToken";
 import { useTokenList } from "../hooks/useTokenList";
 import { Token } from "../../utils/typesInterface";
@@ -75,7 +75,7 @@ const Swap = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [, setBestQuote] = useState<any>(null);
   //gasPrice
-  const [gasPrice, setGasprice] = useState<any>(0);
+  const [_, setGasprice] = useState<any>(0);
   //approval amount
   const [allowanceAmount, setAllowanceAmount] = useState<number>(0);
   //watch chain
@@ -268,7 +268,6 @@ const Swap = () => {
         const price = await getTokenPrice(fromToken.address, fromToken.chainId);
         // const formatable = formatTokenPrice(price);
         const regularNumber = Number(price);
-        
         setFromTokenPrice(regularNumber);
       }
     };
@@ -282,6 +281,7 @@ const Swap = () => {
         const price = await getTokenPrice(toToken.address, toToken.chainId);
         // const formatable = formatTokenPrice(price);
         const regularNumber = Number(price);
+        // console.log(regularNumber, "checking regular number for price on b")
         setToTokenPrice(regularNumber);
       }
     };
@@ -403,7 +403,7 @@ const Swap = () => {
             isV3: quotes[6],
             feeTier: quotes[7]
         };
-      console.log(formattedQuote, "checking things out out out", formattedQuote.path);
+      // console.log(formattedQuote, "checking things out out out", formattedQuote.path);
 
       
       setQuotes(quotes.length === 0 ? [] : [formattedQuote]);
@@ -441,7 +441,9 @@ const Swap = () => {
 
 
       //get swap route or trade route
-      const routesGotten = await getTradePath(formattedQuote.path, swapFromAmount);
+      const addressesInArray = convertToArrayOrdered(formattedQuote.path);
+      const routesGotten = await getTradePath(addressesInArray, swapFromAmount);
+      // console.log(routesGotten, "checking routes gotten in and out", formattedQuote.path, "Another sunny side", addressesInArray);
       if(routesGotten?.length > 0) {
         setTradePath(routesGotten);
         setMadeAchoice("path found");
@@ -663,15 +665,19 @@ const Swap = () => {
             {/* Add the quotes section here */}
             {quotes && quotes.length > 0 && (
               <div className="space-y-2">
-                <p className="text-gray-400">Available Routes:</p>
+                <p className="text-gray-400">Available Info:</p>
                 {quotes.map((quote, index) => (
                   <div key={index} className="flex justify-between text-sm">
-                    <span>{quote.dexName}</span>
-                    <span>{formatAmount(quote.amountOut)} {toToken?.symbol}</span>
+                    <span>Dex</span>
+                    <span> {quote.dexName}</span>
                   </div>
                 ))}
               </div>
             )}
+            {/**
+             * {formatAmount(normalizeScientificNotation(quote.amountOut))}
+             * {toToken?.symbol}
+             */}
 
            {/* <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Route:</span>
@@ -685,10 +691,10 @@ const Swap = () => {
           </div> */}
             {isConnected && 
               <>
-                <div className="flex items-center justify-between text-sm">
+                {/* <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Gas:</span>
                   <span>≈${gasPrice}</span>
-                </div>
+                </div> */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Waiting time:</span>
                   <span>1 min</span>

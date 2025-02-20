@@ -77,16 +77,15 @@ export const formatBigNumber = (value: bigint | number, decimals: number = 18): 
 
 // Utility function to format scientific notation to regular decimal
 export const normalizeScientificNotation = (value: number): number => {
-  // Handle the specific conversion cases
-  if (value >= 5e-13 && value <= 6e-13) {
-    return 0.5505; // For values around 5.46828e-13
+  // Check if the value is in scientific notation
+  if (isScientificNotation(value)) {
+    // Define a scaling factor (e.g., 1e12 for values like 5.13699e-13)
+    const scalingFactor = 1e12;
+    // Scale the value and round it to 4 decimal places (or as needed)
+    return Number((value * scalingFactor).toFixed(4));
   }
-  if (value >= 1e-14 && value <= 2e-14) {
-    return 0.016; // For values around 1.7168e-14
-  }
-
-  // For other cases, convert scientific notation to regular decimal
-  return Number(value.toFixed(20));
+  // For non-scientific notation values, return as is
+  return value;
 };
 
 
@@ -145,6 +144,13 @@ const isScientificNotation = (num: number) => {
 };
 
 
+export const convertToArrayOrdered = (obj: { [key: number]: string }) => {
+  return Object.entries(obj)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([_, value]) => value);
+};
+
+
 //get token price
 export async function getTokenPrice(
   tokenAddress: string | `0x${string}`,
@@ -197,7 +203,7 @@ export async function getBestQuote(
         );
 
         const amountInWei = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals
-        console.log(chain, "Nothing spoil", amountInWei);
+        // console.log(chain, "Nothing spoil", amountInWei);
         const quotes = await contract.getBestQuote(
           fromAddress,
           toAddress,
@@ -280,15 +286,15 @@ export const getGasDetails = async (tokenIn: string, tokenOut: string, amountIn:
     // const publicClient = getPublicClient(config);
 
 
-  //  console.log(
-  //       tokenIn,
-  //       tokenOut,
-  //       amountIn,
-  //       amountOutMin,
-  //       router,
-  //       recipient,
-  //       deadline
-  //      );
+   console.log(
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMin,
+        router,
+        recipient,
+        deadline
+       );
    
 
     // const gasLimit = await publicClient.estimateContractGas({
@@ -337,7 +343,7 @@ export const changeChain = async (): Promise<void> => {
 export const getTradePath = async (tokenAddresses: string[], amount: number) : Promise<string[]> => {
   try {
 
-      if(amount != 0) {
+      if(amount === 0) {
         return [];
       }
       const publicClient = getPublicClient(config);

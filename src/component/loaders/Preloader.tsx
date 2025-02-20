@@ -1,6 +1,6 @@
 function Preloader() {
     return (
-      <div className="bg-black fixed flex justify-center items-center w-full h-[100dvh] z-50 overflow-hidden">
+      <div className="bg-black fixed flex justify-center items-center w-full h-[150dvh] z-50 overflow-hidden">
         <video
           src="/pegasusloader.mp4" // Use `/` if the file is in the public folder
           autoPlay
