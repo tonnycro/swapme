@@ -1,29 +1,44 @@
 import {  useContext, useEffect, useRef, useState } from "react";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { BContext } from "../../utils/Context";
-import {  aggregatorABI, AggregatorAddress, convertToArrayOrdered, ERCABI, formatAddress, formatBigNumber, formatTokenBalance, formatTokenPrice, getBestQuote, getGasDetails, getTokenApproval, getTokenBalance, getTokenPrice, getTradePath } from "../../utils/Constants";
+import {  aggregatorABI, AggregatorAddress, calculateSlippageAdjustedOutput, convertToArrayOrdered, ERCABI, formatBigNumber, formatTokenBalance, formatTokenPrice, getBestQuote, getTokenApproval, getTokenBalance, getTokenPrice, getTradePath, isScientificNotation, normalizeScientificNotation, SupportedChains } from "../../utils/Constants";
 import SelectToken from "./SelectToken";
 import { useTokenList } from "../hooks/useTokenList";
-import { Token } from "../../utils/typesInterface";
+import { DEX, Token } from "../../utils/typesInterface";
 import { config, supportedChainIds } from "../../utils/configigurations";
-import { getAccount } from "wagmi/actions";
+import { getAccount, getPublicClient } from "wagmi/actions";
 import { ethers } from "ethers";
 import StatusReport from "../modals/StatusReport";
 import ChangeChain from "../modals/ChangeChain";
+import { getDexesandWrapped } from "../hooks/getDexesandWrapped";
+import { ConnectKitButton } from "connectkit";
+import { formatUnits } from "viem";
+// import { SlippageSelector } from "./SlippageSelector";
+
+
 
 const Swap = () => {
-  const { showConnectors, setShowConnectors, setNotify, setTradePath, setMadeAchoice, madeAchoice } = useContext(BContext);
+  const { setNotify, setTradePath, setMadeAchoice } = useContext(BContext);
   const { address, isConnected, chainId: watchingChain  } = useAccount();
   const { tokens } = useTokenList();
   const account = getAccount(config);
-  const chainId = account.chainId;
-  const { data: hash,  isPending: pendExecute,  writeContract:executeSwap } = useWriteContract();
+  const chainToUse = account.chainId;
+  const chainId = !isConnected  ? 146 : isConnected && !supportedChainIds.includes(chainToUse as number) ? 146 : chainToUse;
+  const {data:nativeBalance} = useBalance({
+    address: address as `0x${string}`,
+  });
+  
+  //get dexes and wrapped info
+  const { dexes, wrappedInfo } = getDexesandWrapped();
+
+
+  const { data: hash,  isPending: pendExecute, isError,  writeContract:executeSwap } = useWriteContract();
   const { data: hashApprove, isPending: pendApprove,  writeContract: approveSwap } = useWriteContract();
 
   const { isLoading: isConfirmingSwap, isSuccess: isConfirmedSwap } = useWaitForTransactionReceipt({hash});
   const { isSuccess: isConfirmedApproved } = useWaitForTransactionReceipt({hash: hashApprove})
 
-
+  
 
 
   // Initialize with null and set first token after loading
@@ -45,7 +60,7 @@ const Swap = () => {
     }
   }, [tokens, fromToken, toToken]);
 
-
+  
 
   const [recipient, setRecipient] = useState<string | `0x${string}` | undefined>('');
   const [selectedRouter, setSelectedRouter] = useState<string | `0x${string}` | undefined>('');
@@ -70,17 +85,20 @@ const Swap = () => {
   const [fromTokenBalance, setFromTokenBalance] = useState<number>(0);
   const [toTokenBalance, setToTokenBalance] = useState<number>(0);
   //for swap price in dollar
-  const [swapPrice, setSwapPrice] = useState<number>(0);
+  const [, setSwapPrice] = useState<number>(0);
   //for quotes
   const [quotes, setQuotes] = useState<any[]>([]);
   const [, setBestQuote] = useState<any>(null);
   //gasPrice
-  const [_, setGasprice] = useState<any>(0);
+  // const [, setGasprice] = useState<any>(0);
   //approval amount
   const [allowanceAmount, setAllowanceAmount] = useState<number>(0);
   //watch chain
   const [chainAccountChanged] = useState<boolean>(false);
-  
+  //watch for empty quotes
+  const [quoteEmpty, setQuoteEmpty] = useState<boolean>(false);
+  // Add a slippage state
+  const [slippageTolerance, _] = useState<number>(12);
 
 
   const handleTokenSelect = (token: any) => {
@@ -97,6 +115,12 @@ const Swap = () => {
       setFromToken({ ...toToken });
       setToToken(tempToken);
       setSwapPosition(!swapPosition);
+      let oldtoTokenBalNowFromBal = swapToAmount;
+      setSwapFromAmount(oldtoTokenBalNowFromBal);
+      setSwapToAmount(swapFromAmount);
+      // if(oldtoTokenBalNowFromBal != 0) {
+      //   getQuoteOut(oldtoTokenBalNowFromBal);
+      // }
     }
   };
 
@@ -112,7 +136,7 @@ const Swap = () => {
            abi: ERCABI,
            functionName: 'approve',
            args: [
-             AggregatorAddress,
+             AggregatorAddress[chainId as number],
              ethers.parseUnits(swapFromAmount.toString(), fromToken?.decimals || 18)
            ],
          })    
@@ -125,11 +149,23 @@ const Swap = () => {
     }
   }
 
-  //lets swap
+
   const handleSwap = async () => {
    
     let receiver : string | `0x${string}` | undefined = address;
-    const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minute deadline
+    // const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour deadline
+    const publicClient = getPublicClient(config)!;
+    const blockNumber = await publicClient.getBlockNumber();
+    const block = await publicClient.getBlock({
+      blockNumber
+    });
+    const deadline = Number(block.timestamp) + 3600;
+    let amountToCal = swapToAmount;
+    if(isScientificNotation(Number(amountToCal))) {
+      amountToCal = normalizeScientificNotation(amountToCal);
+    }
+
+    let minimumAmountOut = calculateSlippageAdjustedOutput(amountToCal, slippageTolerance);
 
     if(!address) {
       setNotify({
@@ -150,28 +186,44 @@ const Swap = () => {
     try {
       
       const amountSwapFrom = ethers.parseUnits(swapFromAmount.toString(), fromToken?.decimals || 18);
-      const amountSwapTo = ethers.parseUnits(swapToAmount.toString(), toToken?.decimals || 18);
-      const minFeeConverted = ethers.parseUnits(Math.abs(minFee).toString(), 18);
+      const amountSwapTo = ethers.parseUnits(minimumAmountOut.toString(), toToken?.decimals || 18);
+
+      let minFeeToCal = minFee;
+      if(isScientificNotation(Number(minFeeToCal))) {
+        minFeeToCal = normalizeScientificNotation(minFeeToCal);
+      }
+
+      const minFeeConverted = ethers.parseUnits(Math.abs(minFeeToCal).toString(), 18);
       const feeTierConverted = ethers.parseUnits(v3FeeTier.toString(), 18);
 
 
-      console.log('Starting swap execution...'); 
-      console.log('Missing required parameters:', {
-        fromToken: fromToken?.address,
-        toToken: toToken?.address,
-        amountSwapFrom,
-        amountSwapTo,
-        selectedRouter,
-        receiver,
-        deadline,
-        feeTierConverted,
-        minFeeConverted,
-        flowPath,
+     if(flowPath) {
+      if(fromToken?.address === "0x0000000000000000000000000000000000000000" && flowPath[0] !== "0x0000000000000000000000000000000000000000") {
+        flowPath[0] = "0x0000000000000000000000000000000000000000"
+      }
 
-      });     
-      
+      if(toToken?.address === "0x0000000000000000000000000000000000000000" && flowPath[1] !== "0x0000000000000000000000000000000000000000") {
+        flowPath[1] = "0x0000000000000000000000000000000000000000"
+      }
+     }
+
+      // console.log('Missing required parameters:', {
+      //   fromToken: fromToken?.address,
+      //   toToken: toToken?.address,
+      //   amountSwapFrom,
+      //   amountSwapTo,
+      //   selectedRouter,
+      //   receiver,
+      //   deadline,
+      //   feeTierConverted,
+      //   minFeeConverted,
+      //   flowPath,
+      // }); 
+
+      // return;
+
       await executeSwap({
-        address: AggregatorAddress as `0x${string}`,
+        address: AggregatorAddress[chainId as number] as `0x${string}`,
         abi: aggregatorABI,
         functionName: 'executeSwap',
         args: [
@@ -186,6 +238,7 @@ const Swap = () => {
           minFeeConverted,
           flowPath
         ],
+        ...(fromToken?.address === "0x0000000000000000000000000000000000000000" ? { value: amountSwapFrom } : {})
       })
 
       console.log('Swap execution result:');
@@ -201,6 +254,8 @@ const Swap = () => {
 
 
 
+
+
   //close token modal
   const closeTokenModal = () => {
     if(isSelectFromTokenOpen) {
@@ -211,74 +266,83 @@ const Swap = () => {
   }
 
 
+  const setMax = () => {
+    // For native token, leave a small amount for gas
+    if (fromToken?.address === "0x0000000000000000000000000000000000000000") {
+      // Reserve some amount for gas (adjust as needed)
+      const gasReserve = 0.01; // Reserve 0.01 of native token for gas
+      const adjustedBalance = Math.max(0, fromTokenBalance - gasReserve);
+      setSwapFromAmount(adjustedBalance);
+      getQuoteOut(adjustedBalance);
+    } else {
+      // For ERC20 tokens, use the full balance
+      setSwapFromAmount(fromTokenBalance);
+      getQuoteOut(fromTokenBalance);
+    }
+  }
 
 
   useEffect(() => {
     // console.log("Sernergyyyyyyyyy", watchingChain, account.chainId);
 
-        if(isConnected && fromToken?.address !== undefined && watchingChain !== undefined && supportedChainIds.includes(watchingChain as number)) {
+        if(isConnected && fromToken?.address !== undefined && fromToken?.address !== "0x0000000000000000000000000000000000000000" && watchingChain !== undefined && supportedChainIds.includes(watchingChain as number)) {
           const fetchAllowance = async () => {
-            const allowance = await getTokenApproval(fromToken?.address as string, AggregatorAddress, address as string);
-            
-            setAllowanceAmount(allowance);
+            const allowance = await getTokenApproval(fromToken?.address as string, AggregatorAddress[chainId as number], address as string);
+            // console.log(allowance, "checking usdc allowance");
+
+            let allowanceGotten = allowance;
+            if(isScientificNotation(Number(allowanceGotten))) {
+              allowanceGotten = normalizeScientificNotation(allowanceGotten);
+            }
+
+            setAllowanceAmount(allowanceGotten);
           }
           
 
           fetchAllowance();
         }
 
-  }, [allowanceAmount, isConnected, quotes, isConfirmedApproved, chainAccountChanged, watchingChain]);
+  }, [allowanceAmount, isConnected, quotes, isConfirmedApproved, chainAccountChanged, watchingChain, swapFromAmount]);
 
 
-  //handle account chanes and others
-  // useEffect(() => {
-  //   if (connector) {
-  //     const handleAccountsChanged = (accounts: string[]) => {
-  //       // Handle account change logic
-  //       console.log('Accounts changed:', accounts);
-  //       setChainAccountChanged(!chainAccountChanged);
-  //     };
-  
-  //     const handleChainChanged = (chainId: string) => {
-  //       // Handle chain change logic
-  //       const numChainId = parseInt(chainId, 16);
-  //       console.log('Chain changed:', numChainId);
-  //       setChainAccountChanged(!chainAccountChanged);
-  //     };
-  
-  //     connector.onAccountsChanged = handleAccountsChanged;
-  //     connector.onChainChanged = (chainId) => {
-  //        console.log("chain changed omomomom", chainId);
-         
-  //     };
-  
-  //     return () => {
-  //       // Optional: Remove event listeners if needed
-  //       connector.onAccountsChanged = handleAccountsChanged;
-  //       connector.onChainChanged = handleChainChanged;
-  //     };
-  //   }
-  // }, [connector, chainAccountChanged]);
-  
+
 
   // Add this useEffect to fetch prices
   useEffect(() => {
     const fetchPrices = async () => {
-      if (fromToken?.address && fromToken?.chainId) {
-        const price = await getTokenPrice(fromToken.address, fromToken.chainId);
+      if (fromToken?.address) {
+        if (!dexes || !wrappedInfo) {
+          console.log("Required data not available");
+          return 0;
+        }
+        const weth = wrappedInfo[1] as `0x${string}`; 
+        const stable = wrappedInfo[2] as `0x${string}`; 
+        //check from address
+        const ReWriteAddress = fromToken.address === "0x0000000000000000000000000000000000000000" ? weth : fromToken.address;
+        //Get dexes and wrapped here
+        const price = await getTokenPrice(ReWriteAddress, chainId as number, dexes as DEX[], stable, weth);
         // const formatable = formatTokenPrice(price);
         const regularNumber = Number(price);
+        // console.log(regularNumber, "checking again")
         setFromTokenPrice(regularNumber);
       }
     };
 
     fetchPrices();
-  }, [fromToken?.address, fromToken?.chainId, swapPosition, watchingChain]);
+  }, [fromToken?.address, chainId, swapPosition, watchingChain]);
 
   useEffect(() => {
     const fetchPrices = async () => {
-      if (toToken?.address && toToken?.chainId) {
-        const price = await getTokenPrice(toToken.address, toToken.chainId);
+      if (toToken?.address) {
+        if (!dexes || !wrappedInfo) {
+          console.log("Required data not available");
+          return 0;
+        }
+        const weth = wrappedInfo[1] as `0x${string}`; 
+        const stable = wrappedInfo[2] as `0x${string}`;
+        //check from address
+        const ReWriteAddress = toToken.address === "0x0000000000000000000000000000000000000000" ? weth : toToken.address; 
+        const price = await getTokenPrice(ReWriteAddress, chainId as number, dexes as DEX[], stable, weth);
         // const formatable = formatTokenPrice(price);
         const regularNumber = Number(price);
         // console.log(regularNumber, "checking regular number for price on b")
@@ -287,23 +351,30 @@ const Swap = () => {
     };
 
     fetchPrices();
-  }, [toToken?.address, toToken?.chainId, swapPosition, watchingChain]);
+  }, [toToken?.address, chainId, swapPosition, watchingChain]);
 
   //Now fetch token user balance
   useEffect(() => {
     if(isConnected && address && supportedChainIds.includes(watchingChain as number)) {
       
       const fetchTokenBalance = async () => {
-        if (fromToken?.address && fromToken?.chainId) {
-          const balance = await getTokenBalance(fromToken.address, address);
-          const formatable = formatTokenBalance(balance);
+        if (fromToken?.address) {
+          
+          let formatable;
+          if(fromToken.address === "0x0000000000000000000000000000000000000000") {
+            let balance = nativeBalance?.value;
+            formatable = (Number(formatUnits(balance as bigint, 18))).toFixed(4);
+          } else {
+            let balance = await getTokenBalance(fromToken.address, address);
+            formatable = formatTokenBalance(balance);
+          }
           setFromTokenBalance(formatable as number);
         }
       };
   
         fetchTokenBalance();
     }
-  }, [address, quotes, swapPosition, fromToken, isConfirmedSwap, chainAccountChanged, watchingChain]);
+  }, [address, quotes, swapPosition, fromToken, isConfirmedSwap, chainAccountChanged, watchingChain, isConnected]);
 
   useEffect(() => {
     
@@ -311,10 +382,16 @@ const Swap = () => {
       
       const fetchTokenBalance = async () => {
         
-        if (toToken?.address && toToken?.chainId) {
-          
-          const balance = await getTokenBalance(toToken.address, address);
-          const formatable = formatTokenBalance(balance);
+        if (toToken?.address) {
+
+          let formatable;
+          if(toToken.address === "0x0000000000000000000000000000000000000000") {
+            let balance = nativeBalance?.value;
+            formatable = (Number(formatUnits(balance as bigint, 18))).toFixed(4);
+          } else {
+           let balance = await getTokenBalance(toToken.address, address);
+           formatable = formatTokenBalance(balance);
+          }
           setToTokenBalance(formatable as number);
         }
       };
@@ -322,20 +399,28 @@ const Swap = () => {
 
         fetchTokenBalance();
     }
-  }, [address, quotes, swapPosition, toToken, isConfirmedSwap, chainAccountChanged, watchingChain]);
+  }, [address, quotes, swapPosition, toToken, isConfirmedSwap, chainAccountChanged, watchingChain, isConnected]);
 
 
   const inputRef = useRef<HTMLInputElement>(null);
 
 
-  const getQuoteOut = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const getQuoteOut = async (input: React.ChangeEvent<HTMLInputElement> | number) => {
     if(!isConnected && !address && !supportedChainIds.includes(watchingChain as number)) {
       return;
     }
 
 
 
-    const inputValue = e.target.value;
+    let inputValue: string;
+    // Check the type of input and handle accordingly
+    if (typeof input === 'number') {
+      // It's a number, convert to string
+      inputValue = String(input);
+    } else {
+      // It's an event, extract value from target
+      inputValue = input.target.value;
+    }
     let amount: number;
       
     // if(!inputValue) {
@@ -344,7 +429,6 @@ const Swap = () => {
 
     // Handle initial state and single zero input
     if (inputValue === "" || inputValue === "0" && inputValue.length < 1) {
-      console.log("This oneeeeeeeeeeeeeeee, hereeeeeeeeee")
       setSwapFromAmount(0);
       amount = 0;
     }
@@ -364,7 +448,6 @@ const Swap = () => {
     }
     // Handle numbers that start with 0 but aren't decimals
     else if (inputValue.startsWith("0") && inputValue.length > 1 && !inputValue.includes(".")) {
-      console.log("insidous warehousing iiiiiiiggggggggggggg")
       const cleanedValue = inputValue.slice(1);
           // Clear and update the input value directly
       if (inputRef.current) {
@@ -381,15 +464,42 @@ const Swap = () => {
       setSwapFromAmount(amount);
     }
      
-     console.log(amount, "checking what amount was at this junction");
     if(amount === undefined || Number.isNaN(amount)) {
       return;
     }
+      
+      //get wrappedEth
+      if (!dexes || !wrappedInfo) {
+        console.log("Required data not available");
+        return 0;
+      }
+      const weth = wrappedInfo[1] as `0x${string}`; 
+      const {quotes} = await getBestQuote(fromToken as Token, toToken as Token, amount, true, chainId as number, weth);
 
+      // console.log(quotes, typeof quotes, "checking the data structure of the quote");
 
-      const {quotes} = await getBestQuote(fromToken?.address as string, toToken?.address as string, amount, true, chainId as number);
-
-      // console.log(quotes, "checking the data structure of the quote");
+      if(
+        !quotes ||                          // Check if quotes is null/undefined
+        typeof quotes !== 'object' ||       // Ensure it's an object
+        !quotes[1] ||                       // Check if quotes[1] exists
+        quotes[1] === 0n                    // Check if quotes[1] is 0n
+      ) {
+        // console.log("Are we serious, Charlene my baby is talking");
+        setQuoteEmpty(true);
+        setMadeAchoice("path not found");
+        setSwapToAmount(0);
+        if(amount != 0) {
+          setNotify({
+            active: true,
+            type: 'error',
+            title: 'Warning',
+            message: 'path not found'
+          });
+        }
+        return;
+      } else {
+        setQuoteEmpty(false);
+      }
 
 
       // Transform the quote data into the expected format
@@ -403,7 +513,6 @@ const Swap = () => {
             isV3: quotes[6],
             feeTier: quotes[7]
         };
-      // console.log(formattedQuote, "checking things out out out", formattedQuote.path);
 
       
       setQuotes(quotes.length === 0 ? [] : [formattedQuote]);
@@ -412,8 +521,9 @@ const Swap = () => {
       setSelectedRouter(formattedQuote.routerAddress);
       const gottenPrice = formattedQuote.amountOut * toTokenPrice;
       setSwapPrice(gottenPrice);
-      const min =  1 / formattedQuote.amountOut *  formattedQuote.amountIn
+      const min =  1 / formatBigNumber(quotes[2]) *  formatBigNumber(quotes[3]);
       setMinFee(min);
+
       if(formattedQuote.isV3) {
         setV3FeeTier(formattedQuote.feeTier);
         setFlowPath(Object.values(formattedQuote?.v3Path));
@@ -422,7 +532,7 @@ const Swap = () => {
       }
 
       // Fetch the necessary parameters for the swap
-      const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minute deadline
+      // const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minute deadline
       //
       // fromToken?.address as string,
       // toToken?.address as string,
@@ -432,12 +542,12 @@ const Swap = () => {
       // receiver as string,
       // deadline,
 
-      const { gasPrice } = await getGasDetails( fromToken?.address as string, toToken?.address as string, swapFromAmount, swapToAmount, formattedQuote.routerAddress, address as string, deadline.toString());
+      // const { gasPrice } = await getGasDetails( fromToken?.address as string, toToken?.address as string, swapFromAmount, swapToAmount, formattedQuote.routerAddress, address as string, deadline.toString());
       // const allowance = await getTokenApproval(fromToken?.address as string, AggregatorAddress, address as string);
       // console.log(allowance, "setting allowance");
       
       // setAllowanceAmount(allowance);
-      setGasprice(Number(gasPrice));
+      // setGasprice(Number(gasPrice));
 
 
       //get swap route or trade route
@@ -447,10 +557,14 @@ const Swap = () => {
       if(routesGotten?.length > 0) {
         setTradePath(routesGotten);
         setMadeAchoice("path found");
+        // console.log(routesGotten, "wait wait wait wait wait, let keep driving");
       } else {
         setMadeAchoice("path not found");
       }
   }
+
+  const selectedChain = SupportedChains.find((chain) => chain.id === chainToUse);
+
 
 
   return (
@@ -465,13 +579,20 @@ const Swap = () => {
             <h1 className="text-xl font-semibold">Swap</h1>
           </div>
           <div className="text-sm text-gray-400">
-            {address ? `Connected: ${formatAddress(address)}` : 'Connect Wallet'}
+            {/* Toggle Split swap */}
+            {/* <div className="toggle-button-cover">
+              <div className="button r" id="button-3">
+                <input type="checkbox" checked={isSplit} className="checkbox" onChange={() => setIsSplit(!isSplit)} />
+                <div className="knobs" />
+                <div className="layer" />
+              </div>
+            </div>  */}
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-gray-400">I'd like to swap</p>
+            <p className="text-gray-400">I'd like swap from</p>
             <div className="flex items-center gap-4">
               <div className="flex-1 bg-gray-900 rounded-lg p-3">
                 <div className="flex items-center justify-between">
@@ -498,7 +619,7 @@ const Swap = () => {
                                 height="1em"
                                 viewBox="0 0 24 24"
                               >
-                                <path fill="#1B7339" d="m7 10l5 5l5-5z"></path>
+                                <path fill="#ee7244" d="m7 10l5 5l5-5z"></path>
                               </svg>
                             ) : (
                               <svg
@@ -508,7 +629,7 @@ const Swap = () => {
                                 viewBox="0 0 24 24"
                               >
                                 <path
-                                  fill="#1B7339"
+                                  fill="#ee7244"
                                   d="M8.2 14q-.225 0-.362-.15T7.7 13.5q0-.05.15-.35l3.625-3.625q.125-.125.25-.175T12 9.3t.275.05t.25.175l3.625 3.625q.075.075.113.163t.037.187q0 .2-.137.35T15.8 14z"
                                 ></path>
                               </svg>
@@ -519,27 +640,30 @@ const Swap = () => {
                   </div>
                   <span>on</span>
                   <div className="bg-transparent outline-none">
-                    <option>{fromToken?.chain}</option>
+                    <option>{selectedChain && selectedChain.name}</option>
                   </div>
                 </div>
               </div>
             </div>
             <div className="bg-gray-900 rounded-lg p-3">
-              <input
-                type="number"
-                ref={inputRef}
-                value={swapFromAmount} // Use empty string when value is 0
-                // onChange={(e) => {
-                //   const value = parseFloat(e.target.value) === 0 ? 0. : parseFloat(e.target.value);
-                //   setSwapFromAmount(value);
-                //   getQuoteOut(e);
-                // }}
-                onChange={(e) => getQuoteOut(e) }
-                className="bg-transparent w-full outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                placeholder="0.00"
-              />
+              <div className="flex justify-between items-center p-1">
+                <input
+                  type="number"
+                  ref={inputRef}
+                  value={swapFromAmount} // Use empty string when value is 0
+                  // onChange={(e) => {
+                  //   const value = parseFloat(e.target.value) === 0 ? 0. : parseFloat(e.target.value);
+                  //   setSwapFromAmount(value);
+                  //   getQuoteOut(e);
+                  // }}
+                  onChange={(e) => getQuoteOut(e) }
+                  className="bg-transparent w-full outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0.00"
+                />
+                 <div className="cursor-pointer text-sm" onClick={() => setMax()}>Max</div>
+              </div>
               <div className="flex justify-between text-sm text-gray-400">
-                <span>{formatTokenPrice(fromTokenPrice)}</span>
+                <span>{formatTokenPrice(swapFromAmount === 0 ? fromTokenPrice : fromTokenPrice * swapFromAmount)}</span>
                 <span>Bal ≈ {fromTokenBalance}</span>
               </div>
             </div>
@@ -555,7 +679,7 @@ const Swap = () => {
           </div>
 
           <div className="space-y-2">
-            <p className="text-gray-400">And receive to</p>
+            <p className="text-gray-400">And receive</p>
             <div className="bg-gray-900 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -581,7 +705,7 @@ const Swap = () => {
                               height="1em"
                               viewBox="0 0 24 24"
                             >
-                              <path fill="#1B7339" d="m7 10l5 5l5-5z"></path>
+                              <path fill="#ee7244" d="m7 10l5 5l5-5z"></path>
                             </svg>
                           ) : (
                             <svg
@@ -591,7 +715,7 @@ const Swap = () => {
                               viewBox="0 0 24 24"
                             >
                               <path
-                                fill="#1B7339"
+                                fill="#ee7244"
                                 d="M8.2 14q-.225 0-.362-.15T7.7 13.5q0-.05.15-.35l3.625-3.625q.125-.125.25-.175T12 9.3t.275.05t.25.175l3.625 3.625q.075.075.113.163t.037.187q0 .2-.137.35T15.8 14z"
                               ></path>
                             </svg>
@@ -601,14 +725,14 @@ const Swap = () => {
                 </div>
                 <span>on</span>
                 <div className="bg-transparent outline-none">
-                  <option>{toToken?.chain}</option>
+                  <option>{selectedChain && selectedChain.name}</option>
                 </div>
               </div>
             </div>
             <div className="bg-gray-900 rounded-lg p-3">
-              <div className="text-[10px] text-grey-400">
+              {/* <div className="text-[10px] text-grey-400">
                 {formatTokenPrice(swapPrice)}
-              </div>
+              </div> */}
               <input
                 type="text"
                 value={swapToAmount}
@@ -617,7 +741,7 @@ const Swap = () => {
                 placeholder="0.00"  
               />
               <div className="flex justify-between text-sm text-gray-400">
-              <span>{formatTokenPrice(toTokenPrice)}</span>
+              <span>{formatTokenPrice(swapToAmount === 0 ? toTokenPrice :  toTokenPrice * swapToAmount)}</span>
                 <span>Bal ≈ {toTokenBalance}</span>
               </div>
             </div>
@@ -634,9 +758,9 @@ const Swap = () => {
                   type="checkbox"
                   className="sr-only peer"
                   checked={recipient !== ''}
-                  onChange={() => setRecipient(recipient ? '' : '0x')}
+                  onChange={(e) => setRecipient(recipient ? '' : e.target.value)}
                 />
-                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ee7244]"></div>
               </label>
             </div>
             {recipient !== '' && (
@@ -701,36 +825,59 @@ const Swap = () => {
                 </div>
               </>
             }
-            <button
-              onClick={ 
-                 !isConnected ? 
-                   () => setShowConnectors(!showConnectors) 
-                   : isConnected && (!chainId || !supportedChainIds.includes(chainId)) ? 
-                    () => setChangeChainModal(true)
-                   : allowanceAmount === 0 || (allowanceAmount < swapFromAmount ) ?
-                    handleApprove
-                   : handleSwap 
-                  }
-              disabled={pendExecute || ( fromTokenBalance < swapFromAmount ) || madeAchoice === "path not found"} 
-              className={`w-full text-white rounded-lg p-3 transition-colors ${fromTokenBalance < swapFromAmount ? 'bg-gray-400' : 'bg-[#ee7244] hover:bg-[#c75d36]'}`}
-              >
-              { 
-                !isConnected 
-                 ? "Connect Wallet" 
-                 : isConnected && (!chainId || !supportedChainIds.includes(watchingChain as number)) 
-                 ? "Invalid chain Click to Change"
-                 : ( fromTokenBalance < swapFromAmount ) ?
-                  "inSufficient Swap token" 
-                 : madeAchoice === "path not found" ?
-                   "No valid path found"
-                 : isConnected && pendApprove ?
-                  "Approving token..."
-                 : allowanceAmount === 0 || (allowanceAmount < swapFromAmount ) ?
-                  "Approve token"
-                 : isConnected && pendExecute
-                 ? "Loading..." : "Swap"
-                 }
-            </button>
+            {  !isConnected ?
+                  (
+                    <ConnectKitButton.Custom>
+                        {({
+                          show
+                        }) => {
+                          return (
+                            <>
+                              <button className="w-full text-white rounded-lg p-3 transition-colors  bg-[#ee7244] hover:bg-[#c75d36]" onClick={show}>
+                                  Connect wallet
+                              </button>
+                              
+                            </>
+                          );
+                        }}
+                    </ConnectKitButton.Custom>
+                    )
+              :
+                (
+                  <button
+                  onClick={ 
+                       isConnected && (!chainId || !supportedChainIds.includes(chainId)) ? 
+                        () => setChangeChainModal(true)
+                       : (allowanceAmount === 0 || (allowanceAmount < swapFromAmount )) && fromToken?.address !== "0x0000000000000000000000000000000000000000" ?
+                        handleApprove
+                       : handleSwap 
+                      }
+                  disabled={pendExecute || ( fromTokenBalance < swapFromAmount ) || quoteEmpty } 
+                  className={`w-full text-white rounded-lg p-3 transition-colors ${fromTokenBalance < swapFromAmount ? 'bg-gray-400' : 'bg-[#ee7244] hover:bg-[#c75d36]'}`}
+                  >
+                  { 
+                     isConnected && (!chainId || !supportedChainIds.includes(watchingChain as number)) && address
+                     ? "Invalid chain Click to Change"
+                     :  quoteEmpty ?
+                       "No valid path found"
+                     : ( fromTokenBalance < swapFromAmount ) ?
+                      `inSufficient ${fromToken?.address === "0x0000000000000000000000000000000000000000" ? "Amount" : "Swap token"}` 
+                     : isConnected && pendApprove && !isConfirmedApproved ?
+                      "Approving token..."
+                     : (allowanceAmount === 0 || (allowanceAmount < swapFromAmount )) && fromToken?.address !== "0x0000000000000000000000000000000000000000" ?
+                      "Approve token"
+                     : isConnected && pendExecute
+                     ? "Loading..." :
+                        wrappedInfo && wrappedInfo.length > 1 && toToken?.address === "0x0000000000000000000000000000000000000000" && fromToken?.address === (wrappedInfo[1] as `0x${string}`)
+                      ? "Unwrap"
+                      : wrappedInfo && wrappedInfo.length > 1 && fromToken?.address === "0x0000000000000000000000000000000000000000" && toToken?.address === (wrappedInfo[1] as `0x${string}`)
+                      ? "Wrap"
+                       :
+                       "Swap"
+                     }
+                </button>
+              )
+            }
             {/* {isErrorSwap && <div>Error swapping tokens</div>}
             {hash && <div>Transaction Hash: {hash}</div>}
             {isConfirmingSwap && <div>Waiting for confirmation...</div>} 
@@ -746,7 +893,7 @@ const Swap = () => {
               <select className="bg-transparent outline-none">
                 <option>Recommended</option>
               </select>
-            </div>
+            </div> 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-gray-400">
                 Settings
@@ -754,11 +901,13 @@ const Swap = () => {
               </div>
               <button className="text-gray-400">⚙️</button>
             </div>
-          </div> */}
+          </div>
+
+          <SlippageSelector slippageTolerance={slippageTolerance} setSlippageTolerance={setSlippageTolerance} /> */}
         </div>
 
         <div className="mt-4 text-right text-xs text-gray-400">
-          Powered by Pg
+           Powered by Pegasus
         </div>
 
         <SelectToken
@@ -777,6 +926,7 @@ const Swap = () => {
           isConfirmed={isConfirmedSwap}
           hash={hash}
           setStatusMo={setStatusMo}
+          isError={isError}
         />
 
         <ChangeChain

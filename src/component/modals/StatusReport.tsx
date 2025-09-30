@@ -40,7 +40,7 @@ const StatusReport = ({
                     <div className="flex items-center justify-center mb-6">
                         <div className="bg-green-500 rounded-full p-3">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white">
-                            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
+                            <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
                             </svg>
                         </div>
                         </div>
@@ -60,7 +60,7 @@ const StatusReport = ({
                 (
                 <div className="flex flex-col items-center gap-5">
                         <div className="text-red-400">Something went wrong</div>
-                         <button onClick={onClose} className="bg-purple-500 hover:bg-purple-600 text-white font-medium py-3 px-6 rounded-lg w-full">
+                         <button onClick={onClose} className="bg-[#ee7244] hover:bg-[#ee7245] text-white font-medium py-3 px-6 rounded-lg w-full">
                            Back to home
                         </button>
                 </div>

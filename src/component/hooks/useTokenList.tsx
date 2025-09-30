@@ -8,7 +8,7 @@ import { getAccount } from '@wagmi/core'
 
 
 // Define the shape of the raw token data from the contract
-interface RawToken {
+export interface RawToken {
   symbol: string;
   name: string;
   tokenAddress: string;
@@ -35,10 +35,9 @@ const chainId = account.chainId;
 
 
   const { data: contractTokens, isError, isSuccess } = useReadContract({
-    address: AggregatorAddress,
+    address: AggregatorAddress[chainToUse as number] as `0x${string}`,
     abi: aggregatorABI,
     functionName: 'getAllTokens',
-    args: [chainToUse],
     // Add query options to prevent unnecessary refetching
     query: {
       staleTime: 300000, // Consider data fresh for 5 minutes

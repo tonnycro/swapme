@@ -40,3 +40,23 @@ export interface Token {
       deadline: string
     ): Promise<any>;
   }
+
+  export interface IChain {
+    id: number;
+    name: string;
+    img?: string;
+    active?: boolean;
+  }
+
+
+  export interface DEX {
+    name: string;
+    routerAddress: string;
+    factory: string;
+    active: boolean;
+    isV3: boolean;
+    quoter: string;
+    feeTiers: number[];
+  }
+  
+  export type WrappedInfo = [string, `0x${string}`, `0x${string}`];

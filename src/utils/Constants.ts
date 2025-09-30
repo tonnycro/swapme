@@ -1,22 +1,45 @@
 
 import aggregatorABIJson from "./AggregatorAbi.json";
+import priceOracleABIJson from "./PriceOracleAbi.json";
 import ERCAbi from "./Erc20Abi.json";
 import { getPublicClient } from "@wagmi/core";
 import { ethers } from 'ethers';
 import { config } from './configigurations'
 import { useSwitchChain } from 'wagmi'
-import { getGasPrice } from '@wagmi/core'
+// import { getGasPrice } from '@wagmi/core'
+import { DEX, IChain, Token } from "./typesInterface";
 
 
 
   //aggregator
   export const aggregatorABI = aggregatorABIJson;
-  export const AggregatorAddress = "0xb604be578BAd39DFeaDEBCe738F324208e57C221";
+
+  
+  //146 again 0xA0Bc7cD0755E59548f1E571b26db6e2B3adeB37C
+  //rebranded 0xFEA4342fB957e420cb49800F2214FE5196Bd81D3
+  // again 0xDe9dd8c8776cf67A0b285a7cc67a11a5660a0c29
+  //again again 0xAA4FEE96b353DCF5CCf0c4D703502aaDB8f3a346
+  //final one 0xb9e82629285692927c80626e7b579e20A211Eec1
+  //finalized everything  0x738832Ef5E9863128735013f7345023b3E994098
+  export const AggregatorAddress : Record<number, string> = {
+    146: "0x738832Ef5E9863128735013f7345023b3E994098"
+  };
   // erc20 
   export const ERCABI = ERCAbi;
   // main one 0x170EB0A66204FEb483F9Dd8c2C57f6fd8FC4daDC
   // dummy 0x8e1C05680bD88297485f2EB8a9894599A26117aD
-  export const StakingTokenAddress = "0x170EB0A66204FEb483F9Dd8c2C57f6fd8FC4daDC";
+  export const StakingTokenAddress : Record<number, string> = {
+    146: "0x170EB0A66204FEb483F9Dd8c2C57f6fd8FC4daDC"
+  };
+
+
+  //old 0x48518E6d26736e67275a5c920459da8A58da4e0e
+  //new 0xFC7AF42B6753Cb7c7e9EeDc6A9bEF1fA7fAF5B82
+  // new new 0x8D98b0dBBCD7CcD1905571A5C0aA234bD574BeBA
+  export const priceOracleAddress : Record<number, string> = {
+    146: "0x8D98b0dBBCD7CcD1905571A5C0aA234bD574BeBA"
+  }
+
   // Format address to show only first 8 and last 7 characters
   export const formatAddress = (addr: string) => {
     if (!addr) return ''
@@ -109,13 +132,17 @@ export const formatTokenPrice = (price : number) => {
 };
 
 export const formatTokenBalance = (balance : number) => {
-  if (balance >= 1e6) {
-    return (balance / 1e6).toFixed(2) + 'M';
+  let updatedBal = balance;
+  if(isScientificNotation(balance)){
+    updatedBal =  normalizeScientificNotation(updatedBal);
   }
-  if (balance >= 1e3) {
-    return (balance / 1e3).toFixed(2) + 'K';
+  if (updatedBal >= 1e6) {
+    return (updatedBal / 1e6).toFixed(2) + 'M';
   }
-  return parseFloat(balance.toFixed(4));
+  if (updatedBal >= 1e3) {
+    return (updatedBal / 1e3).toFixed(2) + 'K';
+  }
+  return parseFloat(updatedBal.toFixed(4));
 };
 
 
@@ -139,7 +166,7 @@ export const handleChainId = (id: number): string | null => {
 
 
 //for small numbers
-const isScientificNotation = (num: number) => {
+export const isScientificNotation = (num: number) => {
   return num.toString().includes('e') || num.toString().includes('E');
 };
 
@@ -154,20 +181,25 @@ export const convertToArrayOrdered = (obj: { [key: number]: string }) => {
 //get token price
 export async function getTokenPrice(
   tokenAddress: string | `0x${string}`,
-  chainId: number
+  chainId: number,
+  dexes: DEX[],
+  stable: string | `0x${string}`,
+  weth: string | `0x${string}`
 ) {
     try {
-      const publicClient = getPublicClient( config );
+      const publicClient = getPublicClient( config )!;
       // Convert viem public client to ethers provider
       const provider = new ethers.BrowserProvider(publicClient.transport);
 
         const contract = new ethers.Contract(
-            AggregatorAddress,
-            aggregatorABI,
+            priceOracleAddress[chainId as number],
+            priceOracleABIJson,
             provider
         );
+        // console.log(dexes, stable, weth, "assuming")
+        // let testDexes = [dexes[0],dexes[5],dexes[4],dexes[2]];
         
-        const tokenPrice = await contract.getTokenPrice(tokenAddress, chainId);
+        const tokenPrice = await contract.getTokenPrice(tokenAddress, dexes, stable, weth);
         return tokenPrice ? formatBigNumber(tokenPrice) : 0;
     } catch (error) {
         console.error('Error fetching token price:', error);
@@ -178,40 +210,58 @@ export async function getTokenPrice(
 
 //get quote
 export async function getBestQuote(
-  fromAddress: string | `0x${string}`,
-  toAddress: string | `0x${string}`,
+  fromAddress: Token,
+  toAddress: Token,
   amount: number,
   exact: boolean,
   chain: number,
+  weth: string | `0x${string}`
 ) {
     try {
 
-      if(amount === 0) {
-        return {
-          quotes: [],
-          bestQuote: null
-        };
-      }
-      const publicClient = getPublicClient( config );
+      // if(amount === 0) {
+      //   return {
+      //     quotes: [],
+      //     bestQuote: null
+      //   };
+      // }
+      // console.log(
+      //   fromAddress?.address,
+      //   toAddress?.address,
+      //   amount,
+      //   exact,
+      //   chain,
+      //   weth,
+      //   "ajsheeeeeeeeeegdgdg"
+      // )
+      const publicClient = getPublicClient( config )!;
       // Convert viem public client to ethers provider
       const provider = new ethers.BrowserProvider(publicClient.transport);
 
         const contract = new ethers.Contract(
-            AggregatorAddress,
+            AggregatorAddress[chain],
             aggregatorABI,
             provider
         );
 
-        const amountInWei = ethers.parseUnits(amount.toString(), 18); // Assuming 18 decimals
+        const amountInWei = ethers.parseUnits(amount.toString(), fromAddress?.decimals); // Assuming 18 decimals
         // console.log(chain, "Nothing spoil", amountInWei);
-        const quotes = await contract.getBestQuote(
-          fromAddress,
-          toAddress,
-          amountInWei,
-          exact,
-          chain
-        );
+        let quotes;
+        //check native address
+        const ReWriteFromAddress = fromAddress?.address === "0x0000000000000000000000000000000000000000" ? weth : fromAddress?.address; 
+        const ReWriteToAddress = toAddress?.address === "0x0000000000000000000000000000000000000000" ? weth : toAddress?.address; 
 
+
+
+          quotes =  await contract.getBestQuote(
+            ReWriteFromAddress,
+            ReWriteToAddress,
+            amountInWei,
+            exact
+          );
+        
+
+      //  console.log(quotes, "inside of constant");
     
         // Find best quote
         const bestQuote = quotes.reduce((prev: any, current: any) => {
@@ -222,8 +272,12 @@ export async function getBestQuote(
         });
     
         return {quotes, bestQuote};
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching quote:', error);
+        if (error.message.includes('out of gas')) {
+          // Either try again with higher gas limit or skip this quote
+          // You can add retry logic here
+        }
         return {
           quotes: [],
           bestQuote: null
@@ -237,7 +291,7 @@ export async function getTokenBalance(
   userAddress: string | `0x${string}`
 ) {
     try {
-      const publicClient = getPublicClient( config );
+      const publicClient = getPublicClient( config )!;
       // Convert viem public client to ethers provider
       const provider = new ethers.BrowserProvider(publicClient.transport);
 
@@ -262,7 +316,7 @@ export async function getTokenApproval(
   ownerAddress: string | `0x${string}`
 ) {
     try {
-      const publicClient = getPublicClient( config );
+      const publicClient = getPublicClient( config )!;
       // Convert viem public client to ethers provider
       const provider = new ethers.BrowserProvider(publicClient.transport);
 
@@ -281,54 +335,54 @@ export async function getTokenApproval(
 }
 
 
-export const getGasDetails = async (tokenIn: string, tokenOut: string, amountIn: number, amountOutMin: number, router: string, recipient: string, deadline: string) => {
-  try {
-    // const publicClient = getPublicClient(config);
+// export const getGasDetails = async (tokenIn: string, tokenOut: string, amountIn: number, amountOutMin: number, router: string, recipient: string, deadline: string) => {
+//   try {
+//     // const publicClient = getPublicClient(config);
 
 
-   console.log(
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOutMin,
-        router,
-        recipient,
-        deadline
-       );
+//   //  console.log(
+//   //       tokenIn,
+//   //       tokenOut,
+//   //       amountIn,
+//   //       amountOutMin,
+//   //       router,
+//   //       recipient,
+//   //       deadline
+//   //      );
    
 
-    // const gasLimit = await publicClient.estimateContractGas({
-    //   address: AggregatorAddress, // Contract address
-    //   abi: aggregatorABI, // Contract ABI
-    //   functionName: 'executeSwap', // Function to call
-    //   args: [
-    //     tokenIn,
-    //     tokenOut,
-    //     amountIn,
-    //     amountOutMin,
-    //     router,
-    //     recipient,
-    //     deadline
-    //   ], // Arguments (if needed)
-    //   account: recipient as `0x${string}` // Use recipient as the sender/caller
-    // })
+//     // const gasLimit = await publicClient.estimateContractGas({
+//     //   address: AggregatorAddress, // Contract address
+//     //   abi: aggregatorABI, // Contract ABI
+//     //   functionName: 'executeSwap', // Function to call
+//     //   args: [
+//     //     tokenIn,
+//     //     tokenOut,
+//     //     amountIn,
+//     //     amountOutMin,
+//     //     router,
+//     //     recipient,
+//     //     deadline
+//     //   ], // Arguments (if needed)
+//     //   account: recipient as `0x${string}` // Use recipient as the sender/caller
+//     // })
 
-    // console.log(gasLimit, "gasLimit");
+//     // console.log(gasLimit, "gasLimit");
     
 
-    // const gasPrice = (await provider.getFeeData()).gasPrice;
-    const gasPrice = await getGasPrice(config);
+//     // const gasPrice = (await provider.getFeeData()).gasPrice;
+//     const gasPrice = await getGasPrice(config);
     
 
-    return {
-      gasLimit: 0,
-      gasPrice: gasPrice,
-    };
-  } catch (error) {
-    console.error('Error fetching gas amount', error);
-    return { gasLimit: '0', gasPrice: '0' };
-  }
-};
+//     return {
+//       gasLimit: 0,
+//       gasPrice: gasPrice,
+//     };
+//   } catch (error) {
+//     console.error('Error fetching gas amount', error);
+//     return { gasLimit: '0', gasPrice: '0' };
+//   }
+// };
 
 
 export const changeChain = async (): Promise<void> => {
@@ -346,7 +400,7 @@ export const getTradePath = async (tokenAddresses: string[], amount: number) : P
       if(amount === 0) {
         return [];
       }
-      const publicClient = getPublicClient(config);
+      const publicClient = getPublicClient(config)!;
       const provider = new ethers.BrowserProvider(publicClient.transport);
 
       const tokenNames = await Promise.all(
@@ -366,3 +420,37 @@ export const getTradePath = async (tokenAddresses: string[], amount: number) : P
       return tokenAddresses;
   }
 }
+
+
+export const calculateSlippageAdjustedOutput = (quote: number, tolerance: number) => {
+  // Reduce expected output by slippage tolerance
+  return quote * (1 - tolerance / 100);
+};
+
+
+export const SupportedChains : IChain[] = [
+  {
+    id: 146,
+    name: "Sonic",
+    img: "./sonic-logo.svg",
+    active: true
+  },
+  {
+    id: 56,
+    name: "BSC",
+    img: "./bnb-logo.svg",
+    active: false
+  },
+  {
+    id: 42161,
+    name: "Arbitruim",
+    img: "./arb-logo.svg",
+    active: false
+  },
+  {
+    id: 8453,
+    name: "Base",
+    img: "./base_logo.svg",
+    active: false
+  }
+]

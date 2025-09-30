@@ -20,24 +20,28 @@ const ChangeChain = ({
 
       const supportedChains = [
         {
+              name: 'Sonic',
+              id: 146,
+              logo: '/sonic-logo.svg',
+              active: true
+        },
+        {
             name: 'Bsc',
             id: 56,
-            logo: '/bnb-logo.svg'
+            logo: '/bnb-logo.svg',
+            active: false
         },
         {
-            name: 'BscTestnet',
-            id: 97,
-            logo: '/bnb-logo.svg'
+          name: 'Arbitruim',
+          id: 42161,
+          logo: './arb-logo.svg',
+          active: false
         },
         {
-            name: 'Sonic',
-            id: 146,
-            logo: '/sonic-logo.svg'
-        },
-        {
-            name: 'SonicTestnet',
-            id: 57054,
-            logo: '/sonic-logo.svg'
+            name: '8453',
+            id: 8453,
+            logo: './base_logo.svg',
+            active: false
         },
       ]
     
@@ -62,7 +66,7 @@ const ChangeChain = ({
                 <div className="flex flex-col gap-2">
                     {
                         supportedChains.map((data, index) => (
-                        <div onClick={() => pickChain(data.id as 146)} className="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-900 border border-transparent hover:border-gray-700 rounded-lg transition-colors cursor-pointer" key={index}>
+                        <div onClick={() => pickChain(data.id as 146)} className={`w-full flex items-center gap-3 p-3 ${ data?.active === false ? "opacity-50 cursor-not-allowed" : "bg-gray-700 hover:bg-gray-900"} hover:border-gray-700  border border-transparent rounded-lg transition-colors cursor-pointer`} key={index}>
                             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white">
                                 <img src={data.logo} alt="chain logo" />
                             </div>

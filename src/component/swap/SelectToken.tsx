@@ -45,7 +45,7 @@ const SelectToken = ({
   
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-black w-full max-w-md rounded-xl border border-gray-800 p-4">
+        <div className=" bg-gray-900 w-full max-w-md rounded-xl  p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl text-white font-semibold">Select Input Token</h2>
             <button 
@@ -62,7 +62,7 @@ const SelectToken = ({
               placeholder="Search By Name or Symbol"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-900 text-white rounded-lg p-3 pl-10 outline-none border border-gray-700 focus:border-purple-500"
+              className="w-full bg-gray-900 text-white rounded-lg p-3 pl-10 outline-none border border-gray-700 focus:border-[#ee7244]"
             />
             <span className="absolute left-3 top-3.5 text-gray-400">🔍</span>
             {searchQuery && (
@@ -91,7 +91,7 @@ const SelectToken = ({
                   onSelect(token);
                   onClose();
                 }}
-                className="w-full flex items-center gap-3 p-3 hover:bg-gray-900 rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 p-3 hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white">
                   {token.icon.startsWith("http") ? (

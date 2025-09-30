@@ -7,7 +7,7 @@ export function getTokenPrice(
 ) {
 
     const { data: tokenPrice } = useReadContract({
-        address: AggregatorAddress,
+        address: AggregatorAddress[chainId] as `0x${string}`,
         abi: aggregatorABI,
         functionName: 'getTokenPrice',
         args: [tokenAddress, chainId],

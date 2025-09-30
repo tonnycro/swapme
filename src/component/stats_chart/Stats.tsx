@@ -1,6 +1,6 @@
 import { EChartsOption } from 'echarts';
 import SankeyChart from 'echarts-for-react';
-import { useContext, useMemo } from 'react';
+import { useContext, useEffect, useMemo } from 'react';
 import { BContext } from '../../utils/Context';
 
 export default function Stats() {
@@ -75,10 +75,25 @@ export default function Stats() {
     ]
   }), [tradePath]);
 
+  useEffect(() => {
+
+  }, [madeAchoice])
+  
+
   return (
-    <div className='h-[500px] md:h-auto flex flex-col justify-center items-center'>
-      <h1 className='justify-self-start text-center font-bold'>{madeAchoice === "path found" ? "Route path for this trade" : "Possible route paths"}</h1>
-      <SankeyChart option={option} style={{ height: '75%', width: '100%' }} />
+    <div className='h-[100%] flex flex-col justify-center items-center'>
+      {
+        madeAchoice !== "path found" ?
+
+        <h1>Watch Out</h1>
+
+        :
+
+        <>
+              <h1 className='justify-self-start text-center font-bold'>{madeAchoice === "path found" ? "Route path for this trade" : "Possible route paths"}</h1>
+              <SankeyChart option={option} style={{ height: '75%', width: '100%' }} />
+        </>
+      }
     </div>
   );
 }

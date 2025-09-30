@@ -2,22 +2,21 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Footer from './component/footer/Footer'
 import Header from './component/header/Header'
-import Stats from './component/stats_chart/Stats'
-import Swap from './component/swap/Swap'
 import { WagmiProvider } from 'wagmi'
-
 import { useContext, useEffect, useState } from 'react'
 import { BContext } from './utils/Context'
 import { WalletOptions } from './component/header/WalletOptions'
 import { config } from './utils/configigurations'
 import Preloader from './component/loaders/Preloader'
 import Notify from './component/loaders/Notify'
+import { Route, Routes } from 'react-router-dom'
+import Staking from './Pages/Staking'
+import Nft from './Pages/Nft'
+import Home from './Pages/Home'
+import { ConnectKitProvider } from "connectkit";
 
 
-// const { chains, publicClient } = configureChains(
-//   [mainnet, bsc],
-//   [publicProvider()]
-// )
+
 
 
 const queryClient = new QueryClient()
@@ -52,32 +51,38 @@ function App() {
     
 
   return (
-    <div className='relative'>
-     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-       {
-        preloader && <Preloader />
-       }
+    <div className='relative min-h-screen'
+    style={{ 
+      background: "linear-gradient(135deg, #000000 20%, #331109 50%, #662211 70%, #000000 100%)",
+    }}
+    >
+       <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <ConnectKitProvider>
+            {
+              preloader && <Preloader />
+            }
 
-       {
-        notify && <Notify />
-       }
-      {showConnectors && (
-          <WalletOptions onClose={() => setShowConnectors(false)} />
-        )}
-          <Header />
-          <div className="grid grid-cols-1 md:grid-cols-2">
-            {/* Left Section with Swap */}
-            <Swap />
-
-            {/* Right section with charts */}
-            <Stats />
-          </div>
-          <Footer />
-        </QueryClientProvider>
-     </WagmiProvider>
+            {
+              notify && <Notify />
+            }
+            {showConnectors && (
+                <WalletOptions onClose={() => setShowConnectors(false)} />
+              )}
+                <Header />
+                <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/staking" element={<Staking />} />
+                    <Route path="/nft" element={<Nft />} />
+                  </Routes>
+                <Footer />
+              </ConnectKitProvider>
+          </QueryClientProvider>
+      </WagmiProvider>
     </div>
   )
 }
 
 export default App
+
+

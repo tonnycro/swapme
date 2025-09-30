@@ -1,28 +1,32 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import useClickOutside from "./UseClickOutside";
 
 
 interface Option {
-  label?: string;
+  name?: string;
   value?: string | number;
   img?: string;
+  active?: boolean;
 }
 
 interface CustomProps {
   options: Option[] | string[] | number[];
   setSelectedValueForm?: React.Dispatch<React.SetStateAction<any>>;
   setSelectedValueSimple?: React.Dispatch<React.SetStateAction<any>>;
+  useResponsive?: boolean;
 }
 
 const CustomDropdown = ({
   options,
   setSelectedValueForm,
   setSelectedValueSimple,
+  useResponsive = false
 }: CustomProps) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<
     Option | string | number
   >(typeof options[0] === "object" ? options[0] : "");
+  const [isMobile, setIsMobile] = useState(false);
 
   const handleClickOutside = () => {
     if (isOpen) {
@@ -55,22 +59,38 @@ const CustomDropdown = ({
   const isOptionObject = (option: any): option is Option =>
     typeof option === "object";
 
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768); // Tailwind's md breakpoint is 768px
+    };
+
+    // Initial check
+    handleResize();
+
+    // Add event listener
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup on unmount
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className="relative" ref={ref}>
       <div
         onClick={toggleDropdown}
-        className="w-full border text-gray-600 border-orange-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-start cursor-pointer flex justify-between items-center"
+        className={`w-full  text-gray-600 ${ useResponsive ? `${isMobile && "border-hidden"} justify-center md:border md:border-[#ee7244] md:justify-between`  : "border border-[#ee7244] justify-between" } rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-start cursor-pointer flex  items-center`}
       >
         {isOptionObject(selectedOption) && selectedOption.img ? (
           <div className="flex items-center">
             <img
               src={selectedOption.img}
-              alt={`${selectedOption.label || "option"} logo`}
+              alt={`${selectedOption.name || "option"} logo`}
               width={20}
               height={20}
               className="w-5 h-5 mr-2 rounded-full object-contain"
             />
-            <span className="text-white">{selectedOption.label}</span>
+            <span className={`text-white`}>{isMobile ? selectedOption.name?.charAt(0) : selectedOption.name}</span>
           </div>
         ) : (
           <span>{String(selectedOption)}</span>
@@ -107,7 +127,7 @@ const CustomDropdown = ({
         <ul
           className={`absolute z-10 w-full ${
             options.length > 10 ? "h-40" : "h-auto"
-          } mt-1 bg-[#1D202F] rounded shadow-lg overflow-x-hidden overflow-y-auto`}
+          } mt-2 bg-gray-900 rounded shadow-lg overflow-x-hidden overflow-y-auto`}
         >
           {options.map((option, index) =>
             isOptionObject(option) && option.img ? (
@@ -115,19 +135,22 @@ const CustomDropdown = ({
                 key={option.value || index}
                 className={`flex items-center px-4 py-2 cursor-pointer hover:bg-[#3f3a54] ${
                   selectedOption === option
-                    ? "bg-[#3f3a54] border-l-4 border-indigo-500"
-                    : ""
+                  ? "bg-[#3f3a54] border-l-4 border-indigo-500"
+                  : option?.active === false
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-[#3f3a54]"
                 }`}
-                onClick={() => handleOptionClick(option)}
+                // onClick={() => handleOptionClick(option)}
+                onClick={() => option?.active !== false && handleOptionClick(option)}
               >
                 <img
                   src={option.img}
-                  alt={`${option.label} logo`}
+                  alt={`${option.name} logo`}
                   width={20}
                   height={20}
                   className="w-5 h-5 mr-2 rounded-full object-contain"
                 />
-                <span className="text-white">{option.label}</span>
+                <span className={`text-white ${option?.active === false ? "text-gray-400" : ""}`}>{option.name}</span>
               </div>
             ) : (
               <li
